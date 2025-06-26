@@ -20,7 +20,7 @@ You are working on a web-based AI chatbot that controls macOS through an existin
 
 **Tasks**:
 1. **Update LLM Service** (`backend/src/services/llmService.ts`):
-   - Configure OpenRouter API integration (user has key: `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`)
+   - Configure OpenRouter API integration (user has key: ``)
    - Implement function calling workflow with proper tool schema conversion
    - Add conversation context management (maintain chat history)
    - Implement streaming responses for better UX

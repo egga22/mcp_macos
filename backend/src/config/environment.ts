@@ -11,7 +11,7 @@ export const config = {
   llm: {
     openaiApiKey: process.env.OPENAI_API_KEY,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-    openrouterApiKey: process.env.OPENROUTER_API_KEY || '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',
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     defaultProvider: 'openrouter'
   },
   mcp: {
