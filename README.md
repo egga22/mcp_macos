@@ -1,4 +1,146 @@
-# MCP Server - Remote MacOs Use
+# MCP Remote macOS Control Server + AI Chat Web App
+
+**The first open-source MCP server that enables AI to fully control remote macOS systems, now with a web-based chat interface.**
+
+This project provides both:
+1. **MCP Server** - Python-based server for remote macOS control via VNC
+2. **AI Chat Web App** - Modern web interface for chatting with AI to control your Mac
+
+## 🚀 Quick Start for Web App
+
+### Prerequisites
+- Docker Desktop installed
+- Node.js 18+ installed
+- A Mac with Screen Sharing enabled (can be the same machine)
+
+### 1. Clone and Setup
+```bash
+git clone <repository-url>
+cd mcp_macos
+
+# Install root dependencies
+npm install
+
+# Install frontend and backend dependencies
+npm run install:all
+```
+
+### 2. Configure Environment
+```bash
+# Copy example environment file
+cp backend/.env.example backend/.env
+
+# Edit backend/.env with your settings:
+# - MACOS_HOST=localhost (for local control)
+# - MACOS_PASSWORD=your_vnc_password
+# - OPENAI_API_KEY=your_openai_api_key
+```
+
+### 3. Enable Screen Sharing (macOS)
+1. Open System Preferences > Sharing
+2. Enable "Screen Sharing"
+3. Set a VNC password when prompted
+
+### 4. Run the Application
+```bash
+# Start both frontend and backend
+npm run dev
+
+# Or start individually:
+npm run dev:frontend  # Frontend on http://localhost:3000
+npm run dev:backend   # Backend on http://localhost:3001
+```
+
+### 5. Open and Chat!
+1. Open http://localhost:3000 in your browser
+2. Wait for connection to establish
+3. Try commands like:
+   - "Take a screenshot"
+   - "Open Safari"
+   - "Click on the Dock"
+   - "Type hello world"
+
+## 📁 Project Structure
+
+```
+mcp_macos/
+├── frontend/           # Next.js React frontend
+│   ├── src/
+│   │   ├── components/ # Chat interface components
+│   │   ├── hooks/      # Socket.IO and state management
+│   │   ├── stores/     # Zustand state stores
+│   │   └── types/      # TypeScript definitions
+├── backend/            # Node.js Express backend
+│   ├── src/
+│   │   ├── services/   # MCP client, LLM service, chat service
+│   │   ├── config/     # Environment configuration
+│   │   └── utils/      # Logging and utilities
+└── src/               # Original Python MCP server
+    ├── mcp_remote_macos_use/
+    ├── action_handlers.py
+    └── vnc_client.py
+```
+
+## 🔧 Development Commands
+
+```bash
+# Development
+npm run dev              # Start both frontend and backend
+npm run dev:frontend     # Start only frontend
+npm run dev:backend      # Start only backend
+
+# Building
+npm run build            # Build both
+npm run build:frontend   # Build frontend only
+npm run build:backend    # Build backend only
+
+# Testing
+npm run test             # Run all tests
+```
+
+## 🎯 Architecture
+
+```
+Browser ←→ Frontend (Next.js) ←→ Backend (Node.js) ←→ MCP Server (Python) ←→ macOS
+         WebSocket/HTTP        Socket.IO/REST      Docker/stdio         VNC
+```
+
+## 🛠️ How It Works
+
+1. **Frontend**: Modern React app with real-time chat interface
+2. **Backend**: Express.js server with Socket.IO for real-time communication
+3. **LLM Integration**: OpenAI GPT-4 for natural language understanding
+4. **MCP Client**: Communicates with Python MCP server via Docker
+5. **macOS Control**: VNC-based control of local or remote Macs
+
+## 🎮 Example Interactions
+
+```
+You: "Take a screenshot"
+AI: "Here's a screenshot of your Mac desktop:" [shows image]
+
+You: "Click on Safari in the dock"
+AI: "I'll click on Safari in the dock for you" [clicks Safari]
+
+You: "Open a new tab and go to apple.com"
+AI: "Opening a new tab and navigating to apple.com" [executes commands]
+```
+
+## 🔒 Security Notes
+
+- Only use with Macs you own or have explicit permission to control
+- VNC passwords are transmitted securely
+- LLM API keys are stored server-side only
+- All actions are logged for debugging
+
+## 📚 Original MCP Server Documentation
+
+The original Python MCP server functionality remains fully intact. See below for the original documentation about using it directly with Claude Desktop.
+
+---
+
+# Original MCP Server Documentation
+
 **The first open-source MCP server that enables AI to fully control remote macOS systems.**
 
 **A direct alternative to OpenAI Operator, optimized specifically for autonomous AI agents with complete desktop capabilities, requiring no additional software installation.**
