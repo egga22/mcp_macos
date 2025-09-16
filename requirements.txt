@@ -1,4 +1,3 @@
-fastmcp>=2.0,<3.0
-vncdotool>=1.3.0
-Pillow>=10.0.0
-Twisted>=22.0.0
+vncdotool==1.2.0
+Pillow>=10,<11
+Twisted>=22,<24
