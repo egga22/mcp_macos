@@ -9,6 +9,7 @@ export class MCPClient implements MCPClientInterface {
   private tools: MCPTool[] = []
   private responseBuffer: string = ''
   private pendingRequests: Map<number, { resolve: Function, reject: Function, timeout: NodeJS.Timeout }> = new Map()
+  private requestIdCounter = 1
 
   async connect(): Promise<void> {
     try {
@@ -52,15 +53,17 @@ export class MCPClient implements MCPClientInterface {
 
       // Wait a moment for the process to start
       await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      // Load available tools
-      await this.loadTools()
-      
+
+      // Complete MCP initialization handshake and load tools
+      await this.initializeSession()
+      await this.fetchTools()
+
       this.connected = true
       logger.info('MCP client connected successfully')
-      
+
     } catch (error) {
       logger.error('Failed to connect to MCP server:', error)
+      this.disconnect()
       throw error
     }
   }
@@ -101,9 +104,64 @@ export class MCPClient implements MCPClientInterface {
     this.pendingRequests.clear()
   }
 
-  private async loadTools(): Promise<void> {
-    // Define comprehensive set of available tools based on the MCP server capabilities
-    this.tools = [
+  private async initializeSession(): Promise<void> {
+    const initializeParams = {
+      protocolVersion: '2024-11-05',
+      capabilities: { experimental: {} },
+      clientInfo: {
+        name: 'macos-ai-chat-backend',
+        version: '1.0.0'
+      }
+    }
+
+    const response = await this.sendRequest('initialize', initializeParams)
+
+    if (response.error) {
+      const message = response.error.message || 'Failed to initialize MCP session'
+      const code = typeof response.error.code !== 'undefined' ? response.error.code : undefined
+      throw new Error(code !== undefined ? `MCP error ${code}: ${message}` : message)
+    }
+
+    this.sendNotification('notifications/initialized')
+  }
+
+  private async fetchTools(): Promise<void> {
+    try {
+      const response = await this.sendRequest('tools/list', {})
+
+      if (response.error) {
+        const message = response.error.message || 'Unknown MCP error'
+        logger.warn(`tools/list returned error: ${message}`)
+        this.tools = this.getDefaultTools()
+        return
+      }
+
+      const serverTools = response.result?.tools
+
+      if (Array.isArray(serverTools) && serverTools.length > 0) {
+        this.tools = serverTools.map((tool: any) => ({
+          name: tool.name,
+          description: tool.description ?? 'No description provided',
+          inputSchema: tool.inputSchema ?? {
+            type: 'object',
+            properties: {},
+            required: []
+          }
+        }))
+        logger.info(`Loaded ${this.tools.length} MCP tools from server`)
+        return
+      }
+
+      logger.warn('MCP server returned no tools, falling back to defaults')
+      this.tools = this.getDefaultTools()
+    } catch (error) {
+      logger.warn('Failed to load tools from MCP server, using default tool set', error)
+      this.tools = this.getDefaultTools()
+    }
+  }
+
+  private getDefaultTools(): MCPTool[] {
+    return [
       {
         name: 'remote_macos_get_screen',
         description: 'Take a screenshot of the remote macOS desktop to see what\'s currently displayed',
@@ -223,8 +281,6 @@ export class MCPClient implements MCPClientInterface {
         }
       }
     ]
-    
-    logger.info(`Loaded ${this.tools.length} MCP tools`)
   }
 
   async listTools(): Promise<MCPTool[]> {
@@ -239,34 +295,17 @@ export class MCPClient implements MCPClientInterface {
     try {
       logger.info(`Calling MCP tool: ${name}`, args)
 
-      // Create MCP request with unique ID
-      const requestId = Date.now() + Math.random()
-      const request = {
-        jsonrpc: '2.0',
-        id: requestId,
-        method: 'tools/call',
-        params: {
-          name,
-          arguments: args
-        }
-      }
-
-      // Send request to MCP server
-      const requestString = JSON.stringify(request) + '\n'
-      
-      if (!this.mcpProcess.stdin?.writable) {
-        throw new Error('MCP process stdin not writable')
-      }
-      
-      this.mcpProcess.stdin.write(requestString)
-
-      // Wait for response with promise-based approach
-      const response = await this.waitForResponse(requestId)
+      const response = await this.sendRequest('tools/call', {
+        name,
+        arguments: args ?? {}
+      })
 
       if (response.error) {
+        const code = typeof response.error.code !== 'undefined' ? response.error.code : undefined
+        const message = response.error.message || 'Unknown MCP error'
         return {
           success: false,
-          error: response.error.message || 'Unknown MCP error',
+          error: code !== undefined ? `MCP error ${code}: ${message}` : message,
           toolName: name
         }
       }
@@ -310,6 +349,31 @@ export class MCPClient implements MCPClientInterface {
     }
   }
 
+  private async sendRequest(method: string, params: Record<string, any> | undefined): Promise<any> {
+    if (!this.mcpProcess || !this.mcpProcess.stdin?.writable) {
+      throw new Error('MCP process stdin not writable')
+    }
+
+    const requestId = this.getNextRequestId()
+    const responsePromise = this.waitForResponse(requestId)
+
+    const requestPayload = {
+      jsonrpc: '2.0',
+      id: requestId,
+      method,
+      params
+    }
+
+    try {
+      this.mcpProcess.stdin.write(JSON.stringify(requestPayload) + '\n')
+    } catch (error) {
+      this.pendingRequests.delete(requestId)
+      throw error
+    }
+
+    return responsePromise
+  }
+
   private async waitForResponse(requestId: number): Promise<any> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -319,6 +383,28 @@ export class MCPClient implements MCPClientInterface {
 
       this.pendingRequests.set(requestId, { resolve, reject, timeout })
     })
+  }
+
+  private sendNotification(method: string, params: Record<string, any> | undefined = undefined): void {
+    if (!this.mcpProcess?.stdin?.writable) {
+      return
+    }
+
+    const notification = {
+      jsonrpc: '2.0',
+      method,
+      params
+    }
+
+    try {
+      this.mcpProcess.stdin.write(JSON.stringify(notification) + '\n')
+    } catch (error) {
+      logger.warn(`Failed to send MCP notification ${method}:`, error)
+    }
+  }
+
+  private getNextRequestId(): number {
+    return this.requestIdCounter++
   }
 
   isConnected(): boolean {

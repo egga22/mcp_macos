@@ -21,8 +21,14 @@ from mcp.server import NotificationOptions, Server
 import mcp.server.stdio
 
 # Import LiveKit
-from livekit import api
-from .livekit_handler import LiveKitHandler
+try:
+    from livekit import api  # type: ignore
+    from .livekit_handler import LiveKitHandler
+    LIVEKIT_AVAILABLE = True
+except ImportError:
+    api = None  # type: ignore
+    LiveKitHandler = None  # type: ignore
+    LIVEKIT_AVAILABLE = False
 
 # Import VNC client functionality from the src directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,6 +54,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger('mcp_remote_macos_use')
 logger.setLevel(logging.DEBUG)
+
+if not LIVEKIT_AVAILABLE:
+    logger.warning('LiveKit SDK not available. LiveKit features will be disabled.')
 
 # Load environment variables for VNC connection
 MACOS_HOST = os.environ.get('MACOS_HOST', '')
@@ -87,7 +96,8 @@ async def main():
 
     # Initialize LiveKit handler if environment variables are set
     livekit_handler = None
-    if all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
+    livekit_env_configured = all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET])
+    if livekit_env_configured and LIVEKIT_AVAILABLE and LiveKitHandler and api:
         livekit_handler = LiveKitHandler()
 
         # Generate access token for the room
@@ -106,6 +116,8 @@ async def main():
         else:
             logger.warning("Failed to establish LiveKit connection")
             livekit_handler = None
+    elif livekit_env_configured and not LIVEKIT_AVAILABLE:
+        logger.warning("LiveKit environment variables are set but the LiveKit SDK is not installed. Skipping LiveKit integration.")
 
     # Validate required environment variables
     if not MACOS_HOST:
