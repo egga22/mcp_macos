@@ -12,12 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Mock socket to prevent real network connections
 @pytest.fixture(autouse=True)
 def mock_socket():
-    with patch('socket.socket') as mock_socket:
-        # Configure the mock to return a mock socket instance that doesn't
-        # try to make real connections
-        mock_instance = MagicMock()
-        mock_socket.return_value = mock_instance
-        yield mock_socket
+    yield
 
 # Direct imports with absolute paths
 import src.action_handlers as action_handlers
